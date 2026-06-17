@@ -190,7 +190,7 @@ Run backend tests:
 ```bash
 cd Sightline_v5
 source .venv/bin/activate
-PYTHONPATH=. python -m pytest -q
+pytest -q
 ```
 
 Build the frontend:
