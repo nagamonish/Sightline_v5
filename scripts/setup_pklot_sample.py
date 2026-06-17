@@ -19,7 +19,7 @@ def download(url: str, destination: Path, force: bool = False) -> None:
     if destination.exists() and not force:
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    request = urllib.request.Request(url, headers={"User-Agent": "ParkIQ sample setup"})
+    request = urllib.request.Request(url, headers={"User-Agent": "Sightline sample setup"})
     with urllib.request.urlopen(request, timeout=45) as response:
         destination.write_bytes(response.read())
 
@@ -36,7 +36,7 @@ def first_hf_sample(samples_url: str = HF_SAMPLES_URL) -> dict[str, Any]:
     """Stream just the first sample object from the large Hugging Face metadata file."""
     request = urllib.request.Request(
         samples_url,
-        headers={"User-Agent": "ParkIQ sample setup"},
+        headers={"User-Agent": "Sightline sample setup"},
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         started = False
@@ -183,7 +183,7 @@ def write_outputs(output_dir: Path, force: bool = False) -> None:
                     "ffmpeg -re -loop 1 -framerate 5 -i "
                     f"{image_path} -vf \"format=yuv420p\" -an "
                     "-c:v libx264 -preset ultrafast -tune zerolatency -r 5 -g 10 "
-                    "-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/parkiq"
+                    "-f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/sightline"
                 ),
             },
             indent=2,
@@ -205,12 +205,12 @@ def write_outputs(output_dir: Path, force: bool = False) -> None:
     print("Loop this image into MediaMTX with:")
     print(json.loads(manifest_path.read_text(encoding="utf-8"))["ffmpeg_command"])
     print()
-    print("Then load the polygons into ParkIQ with:")
+    print("Then load the polygons into Sightline with:")
     print("curl -X POST http://localhost:8000/cameras/cam1/samples/pklot")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepare a small PKLot fixture for ParkIQ.")
+    parser = argparse.ArgumentParser(description="Prepare a small PKLot fixture for Sightline.")
     parser.add_argument(
         "--output-dir",
         default="sample-data/pklot",

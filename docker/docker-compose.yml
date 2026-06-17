@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.backend
     environment:
-      DATABASE_URL: postgresql://parkiq:parkiq@postgres:5432/parkiq
+      DATABASE_URL: postgresql://sightline:sightline@postgres:5432/sightline
       REDIS_URL: redis://redis:6379
       MODEL_PATH: /models/yolov8m-obb.pt
       IOU_THRESHOLD: "0.40"
@@ -31,9 +31,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: parkiq
-      POSTGRES_USER: parkiq
-      POSTGRES_PASSWORD: parkiq
+      POSTGRES_DB: sightline
+      POSTGRES_USER: sightline
+      POSTGRES_PASSWORD: sightline
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../scripts/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro

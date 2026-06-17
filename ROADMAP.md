@@ -4,7 +4,6 @@ This roadmap tracks the next useful improvements for Sightline.
 
 ## Near Term
 
-- Rename remaining ParkIQ references to Sightline.
 - Fix the Docker model path and sample data setup.
 - Make `POST /cameras` preserve existing calibrated slots.
 - Make backend tests run with plain `pytest`.

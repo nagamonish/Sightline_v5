@@ -17,7 +17,7 @@ Annotated reference image:
 When MediaMTX and FFmpeg are running locally, enter this RTSP URL in the app:
 
 ```text
-rtsp://127.0.0.1:8554/parkiq
+rtsp://127.0.0.1:8554/sightline
 ```
 
 ## Demo Flow

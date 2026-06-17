@@ -21,7 +21,7 @@ class Database:
     def __init__(self, database_url: str | None = None) -> None:
         self.database_url = database_url or os.getenv(
             "DATABASE_URL",
-            "postgresql://parkiq:parkiq@postgres:5432/parkiq",
+            "postgresql://sightline:sightline@postgres:5432/sightline",
         )
         self.pool: Any = None
         self.memory_mode = False
