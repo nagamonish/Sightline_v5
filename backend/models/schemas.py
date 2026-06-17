@@ -25,7 +25,10 @@ class CameraCreate(BaseModel):
     camera_id: str = Field(..., min_length=1)
     rtsp_url: str = Field(..., min_length=1)
     name: str | None = None
-    slots: list[SlotCreate] = Field(default_factory=list)
+    # Optional: when omitted (or empty), POST /cameras leaves any previously
+    # calibrated slots in place. Use POST /cameras/{id}/slots to overwrite
+    # them explicitly, or DELETE /cameras/{id} to wipe everything.
+    slots: list[SlotCreate] | None = None
 
 
 class SlotUpdate(BaseModel):
