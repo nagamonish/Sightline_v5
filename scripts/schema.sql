@@ -54,15 +54,70 @@ BEFORE UPDATE ON parking_slots
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS hourly_occupancy AS
+-- Time-weighted hourly occupancy. The previous version of this view counted
+-- *events* per bucket; a slot occupied for five hours without state changes
+-- contributed only one row. This version derives (start, end] state intervals
+-- per slot from consecutive events (LEAD), splits each interval at hour
+-- boundaries with generate_series, and sums the seconds in each bucket.
+-- occupancy_pct is the time-weighted ratio occupied_seconds / total_seconds.
+DROP MATERIALIZED VIEW IF EXISTS hourly_occupancy;
+
+CREATE MATERIALIZED VIEW hourly_occupancy AS
+WITH events AS (
+    SELECT
+        camera_id,
+        slot_id,
+        occupied,
+        event_time,
+        LEAD(event_time, 1, now()) OVER (
+            PARTITION BY camera_id, slot_id ORDER BY event_time
+        ) AS next_time
+    FROM occupancy_events
+),
+bucketed AS (
+    SELECT
+        e.camera_id,
+        bucket,
+        e.occupied,
+        e.event_time,
+        e.next_time
+    FROM events e
+    CROSS JOIN LATERAL generate_series(
+        date_trunc('hour', e.event_time),
+        date_trunc('hour', e.next_time),
+        interval '1 hour'
+    ) AS bucket
+),
+durations AS (
+    SELECT
+        camera_id,
+        bucket AS hour_bucket,
+        occupied,
+        GREATEST(
+            EXTRACT(EPOCH FROM (
+                LEAST(next_time, bucket + interval '1 hour')
+                - GREATEST(event_time, bucket)
+            )),
+            0
+        ) AS seconds_in_bucket
+    FROM bucketed
+)
 SELECT
     camera_id,
-    date_trunc('hour', event_time) AS hour_bucket,
-    COUNT(*) FILTER (WHERE occupied) AS occupied_events,
-    COUNT(*) AS total_events,
-    AVG(CASE WHEN occupied THEN 100.0 ELSE 0.0 END) AS avg_occupancy_pct
-FROM occupancy_events
-GROUP BY camera_id, date_trunc('hour', event_time)
+    hour_bucket,
+    SUM(CASE WHEN occupied THEN seconds_in_bucket ELSE 0 END) AS occupied_seconds,
+    SUM(seconds_in_bucket) AS total_seconds,
+    CASE
+        WHEN SUM(seconds_in_bucket) > 0
+            THEN ROUND(
+                (SUM(CASE WHEN occupied THEN seconds_in_bucket ELSE 0 END)
+                    * 100.0 / SUM(seconds_in_bucket))::numeric,
+                2
+            )
+        ELSE 0.0
+    END AS occupancy_pct
+FROM durations
+GROUP BY camera_id, hour_bucket
 WITH NO DATA;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_hourly_occupancy_camera_hour

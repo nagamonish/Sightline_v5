@@ -230,32 +230,90 @@ class Database:
                 record["event_time"],
             )
 
+    # ------------------------------------------------------------------
+    # Analytics — time-weighted, not event-counted.
+    #
+    # The old implementations bucketed by event count, so a slot that was
+    # occupied for five hours but never changed state during that period
+    # contributed only one "occupied event" to history and zero contribution
+    # to anything else. The implementations below derive (start, end] state
+    # intervals per slot using consecutive events (current event_time ->
+    # next event_time for that slot, capped at now() for the last open
+    # interval), split each interval at hour boundaries, and sum seconds
+    # per bucket. The reported occupancy_pct is the time-weighted ratio
+    # occupied_seconds / total_seconds per bucket.
+    # ------------------------------------------------------------------
+
+    def _memory_intervals(
+        self, camera_id: str, since: datetime | None
+    ) -> list[dict[str, Any]]:
+        """Group memory-mode events into per-slot (start, end] intervals."""
+        now = datetime.now(UTC)
+        by_slot: dict[str, list[dict[str, Any]]] = {}
+        for event in self._events:
+            if event["camera_id"] != camera_id:
+                continue
+            by_slot.setdefault(event["slot_id"], []).append(event)
+
+        intervals: list[dict[str, Any]] = []
+        for slot_events in by_slot.values():
+            ordered = sorted(slot_events, key=lambda e: e["event_time"])
+            for index, event in enumerate(ordered):
+                start: datetime = event["event_time"]
+                end = ordered[index + 1]["event_time"] if index + 1 < len(ordered) else now
+                if since is not None and end <= since:
+                    continue
+                if since is not None and start < since:
+                    start = since
+                if end <= start:
+                    continue
+                intervals.append(
+                    {"start": start, "end": end, "occupied": bool(event["occupied"])}
+                )
+        return intervals
+
+    @staticmethod
+    def _accumulate_seconds(
+        intervals: list[dict[str, Any]],
+        bucket_key,  # callable: datetime -> hashable
+    ) -> dict[Any, dict[str, float]]:
+        """Split intervals at hour boundaries and sum seconds per bucket."""
+        buckets: dict[Any, dict[str, float]] = {}
+        hour = timedelta(hours=1)
+        for interval in intervals:
+            cursor: datetime = interval["start"]
+            end: datetime = interval["end"]
+            while cursor < end:
+                hour_start = cursor.replace(minute=0, second=0, microsecond=0)
+                hour_end = hour_start + hour
+                chunk_end = min(end, hour_end)
+                seconds = (chunk_end - cursor).total_seconds()
+                if seconds > 0:
+                    key = bucket_key(hour_start)
+                    bucket = buckets.setdefault(
+                        key, {"occupied_seconds": 0.0, "total_seconds": 0.0}
+                    )
+                    bucket["total_seconds"] += seconds
+                    if interval["occupied"]:
+                        bucket["occupied_seconds"] += seconds
+                cursor = chunk_end
+        return buckets
+
     async def history(self, camera_id: str, hours: int = 24) -> list[dict[str, Any]]:
         since = datetime.now(UTC) - timedelta(hours=hours)
         if self.memory_mode:
-            buckets: dict[str, dict[str, int]] = {}
-            for event in self._events:
-                if event["camera_id"] != camera_id or event["event_time"] < since:
-                    continue
-                bucket = event["event_time"].replace(
-                    minute=0,
-                    second=0,
-                    microsecond=0,
-                ).isoformat()
-                stats = buckets.setdefault(bucket, {"occupied": 0, "total": 0})
-                stats["total"] += 1
-                if event["occupied"]:
-                    stats["occupied"] += 1
+            intervals = self._memory_intervals(camera_id, since)
+            buckets = self._accumulate_seconds(intervals, bucket_key=lambda dt: dt.isoformat())
             return [
                 {
                     "bucket": bucket,
-                    "occupied": stats["occupied"],
-                    "total": stats["total"],
+                    "occupied_seconds": round(stats["occupied_seconds"], 2),
+                    "total_seconds": round(stats["total_seconds"], 2),
                     "occupancy_pct": round(
-                        (stats["occupied"] / stats["total"]) * 100.0,
+                        (stats["occupied_seconds"] / stats["total_seconds"]) * 100.0,
                         2,
                     )
-                    if stats["total"]
+                    if stats["total_seconds"]
                     else 0.0,
                 }
                 for bucket, stats in sorted(buckets.items())
@@ -264,14 +322,52 @@ class Database:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT date_trunc('hour', event_time) AS bucket,
-                       COUNT(*) FILTER (WHERE occupied) AS occupied,
-                       COUNT(*) AS total
-                FROM occupancy_events
-                WHERE camera_id = $1
-                  AND event_time >= now() - ($2::text || ' hours')::interval
-                GROUP BY 1
-                ORDER BY 1 ASC
+                WITH events AS (
+                    SELECT
+                        slot_id,
+                        occupied,
+                        event_time,
+                        LEAD(event_time, 1, now()) OVER (
+                            PARTITION BY camera_id, slot_id ORDER BY event_time
+                        ) AS next_time
+                    FROM occupancy_events
+                    WHERE camera_id = $1
+                ),
+                bucketed AS (
+                    SELECT
+                        bucket,
+                        e.occupied,
+                        e.event_time,
+                        e.next_time
+                    FROM events e
+                    CROSS JOIN LATERAL generate_series(
+                        date_trunc('hour', e.event_time),
+                        date_trunc('hour', e.next_time),
+                        interval '1 hour'
+                    ) AS bucket
+                    WHERE e.next_time > now() - ($2::text || ' hours')::interval
+                ),
+                durations AS (
+                    SELECT
+                        bucket,
+                        occupied,
+                        GREATEST(
+                            EXTRACT(EPOCH FROM (
+                                LEAST(next_time, bucket + interval '1 hour')
+                                - GREATEST(event_time, bucket)
+                            )),
+                            0
+                        ) AS seconds_in_bucket
+                    FROM bucketed
+                    WHERE bucket >= date_trunc('hour', now() - ($2::text || ' hours')::interval)
+                )
+                SELECT
+                    bucket,
+                    SUM(CASE WHEN occupied THEN seconds_in_bucket ELSE 0 END) AS occupied_seconds,
+                    SUM(seconds_in_bucket) AS total_seconds
+                FROM durations
+                GROUP BY bucket
+                ORDER BY bucket ASC
                 """,
                 camera_id,
                 hours,
@@ -280,13 +376,14 @@ class Database:
         return [
             {
                 "bucket": row["bucket"].isoformat(),
-                "occupied": int(row["occupied"]),
-                "total": int(row["total"]),
+                "occupied_seconds": round(float(row["occupied_seconds"] or 0.0), 2),
+                "total_seconds": round(float(row["total_seconds"] or 0.0), 2),
                 "occupancy_pct": round(
-                    (int(row["occupied"]) / int(row["total"])) * 100.0,
+                    float(row["occupied_seconds"] or 0.0)
+                    / float(row["total_seconds"]) * 100.0,
                     2,
                 )
-                if int(row["total"])
+                if row["total_seconds"]
                 else 0.0,
             }
             for row in rows
@@ -294,43 +391,73 @@ class Database:
 
     async def peak_hours(self, camera_id: str) -> list[dict[str, Any]]:
         if self.memory_mode:
-            buckets: dict[int, dict[str, int]] = {}
-            for event in self._events:
-                if event["camera_id"] != camera_id:
-                    continue
-                hour = event["event_time"].hour
-                stats = buckets.setdefault(hour, {"occupied": 0, "total": 0})
-                stats["total"] += 1
-                if event["occupied"]:
-                    stats["occupied"] += 1
-            return [
-                {
-                    "hour": hour,
-                    "occupied_events": stats["occupied"],
-                    "avg_occupancy_pct": round(
-                        (stats["occupied"] / stats["total"]) * 100.0,
-                        2,
-                    )
-                    if stats["total"]
-                    else 0.0,
-                }
-                for hour, stats in sorted(
-                    buckets.items(),
-                    key=lambda item: item[1]["occupied"],
-                    reverse=True,
-                )
-            ]
+            intervals = self._memory_intervals(camera_id, since=None)
+            buckets = self._accumulate_seconds(intervals, bucket_key=lambda dt: dt.hour)
+            return sorted(
+                (
+                    {
+                        "hour": hour,
+                        "occupied_seconds": round(stats["occupied_seconds"], 2),
+                        "total_seconds": round(stats["total_seconds"], 2),
+                        "avg_occupancy_pct": round(
+                            (stats["occupied_seconds"] / stats["total_seconds"]) * 100.0,
+                            2,
+                        )
+                        if stats["total_seconds"]
+                        else 0.0,
+                    }
+                    for hour, stats in buckets.items()
+                ),
+                key=lambda item: (-item["occupied_seconds"], item["hour"]),
+            )
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT EXTRACT(HOUR FROM event_time)::int AS hour,
-                       COUNT(*) FILTER (WHERE occupied) AS occupied_events,
-                       AVG(CASE WHEN occupied THEN 100.0 ELSE 0.0 END) AS avg_occupancy_pct
-                FROM occupancy_events
-                WHERE camera_id = $1
-                GROUP BY 1
-                ORDER BY occupied_events DESC, hour ASC
+                WITH events AS (
+                    SELECT
+                        slot_id,
+                        occupied,
+                        event_time,
+                        LEAD(event_time, 1, now()) OVER (
+                            PARTITION BY camera_id, slot_id ORDER BY event_time
+                        ) AS next_time
+                    FROM occupancy_events
+                    WHERE camera_id = $1
+                ),
+                bucketed AS (
+                    SELECT
+                        bucket,
+                        e.occupied,
+                        e.event_time,
+                        e.next_time
+                    FROM events e
+                    CROSS JOIN LATERAL generate_series(
+                        date_trunc('hour', e.event_time),
+                        date_trunc('hour', e.next_time),
+                        interval '1 hour'
+                    ) AS bucket
+                ),
+                durations AS (
+                    SELECT
+                        EXTRACT(HOUR FROM bucket)::int AS hour,
+                        occupied,
+                        GREATEST(
+                            EXTRACT(EPOCH FROM (
+                                LEAST(next_time, bucket + interval '1 hour')
+                                - GREATEST(event_time, bucket)
+                            )),
+                            0
+                        ) AS seconds_in_bucket
+                    FROM bucketed
+                )
+                SELECT
+                    hour,
+                    SUM(CASE WHEN occupied THEN seconds_in_bucket ELSE 0 END) AS occupied_seconds,
+                    SUM(seconds_in_bucket) AS total_seconds
+                FROM durations
+                GROUP BY hour
+                ORDER BY occupied_seconds DESC, hour ASC
                 """,
                 camera_id,
             )
@@ -338,8 +465,15 @@ class Database:
         return [
             {
                 "hour": int(row["hour"]),
-                "occupied_events": int(row["occupied_events"]),
-                "avg_occupancy_pct": round(float(row["avg_occupancy_pct"] or 0.0), 2),
+                "occupied_seconds": round(float(row["occupied_seconds"] or 0.0), 2),
+                "total_seconds": round(float(row["total_seconds"] or 0.0), 2),
+                "avg_occupancy_pct": round(
+                    float(row["occupied_seconds"] or 0.0)
+                    / float(row["total_seconds"]) * 100.0,
+                    2,
+                )
+                if row["total_seconds"]
+                else 0.0,
             }
             for row in rows
         ]
