@@ -797,6 +797,55 @@ button {
   font-size: 13px;
 }
 
+.calibration-stage.picking {
+  box-shadow: 0 0 0 2px var(--green) inset;
+}
+
+.picking-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: rgba(11, 11, 22, 0.92);
+  color: var(--text);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picking-banner button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.homography-pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  grid-column: 1 / -1;
+}
+
+.homography-pickers small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.homography-quad polygon {
+  pointer-events: none;
+}
+
 .calibration-stage polygon {
   fill: rgba(46, 233, 135, 0.14);
   stroke: var(--green);
