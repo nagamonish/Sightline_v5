@@ -163,10 +163,20 @@ async def health() -> dict[str, Any]:
 @app.post("/cameras")
 async def add_camera(payload: CameraCreate) -> dict[str, Any]:
     name = payload.name or payload.camera_id
-    slot_dicts = [slot.model_dump() for slot in payload.slots]
 
     await database.upsert_camera(payload.camera_id, payload.rtsp_url, name)
-    stored_slots = await database.replace_slots(payload.camera_id, slot_dicts)
+
+    # Only overwrite the stored slot list when the caller explicitly submits
+    # one. Re-adding a camera, editing its metadata, or testing the RTSP URL
+    # used to wipe every calibrated space because the frontend sends an empty
+    # `slots: []`. Use POST /cameras/{id}/slots to update slots intentionally,
+    # or DELETE /cameras/{id} to clear them.
+    if payload.slots:
+        slot_dicts = [slot.model_dump() for slot in payload.slots]
+        stored_slots = await database.replace_slots(payload.camera_id, slot_dicts)
+    else:
+        stored_slots = await database.get_slots(payload.camera_id)
+
     worker = camera_manager.add_camera(
         camera_id=payload.camera_id,
         rtsp_url=payload.rtsp_url,
