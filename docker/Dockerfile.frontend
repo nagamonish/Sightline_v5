@@ -1,9 +1,10 @@
 FROM node:20-alpine AS build
 
 ARG VITE_API_URL=/api
-ARG VITE_WS_URL=ws://localhost/ws
 ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_WS_URL=$VITE_WS_URL
+# VITE_WS_URL is intentionally not baked into the production build — the
+# bundle derives the WebSocket URL from window.location at runtime so the
+# same image works from any host (see frontend/src/pages/Dashboard.jsx).
 
 WORKDIR /app
 COPY frontend/package*.json ./
