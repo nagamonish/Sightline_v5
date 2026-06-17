@@ -22,8 +22,16 @@ Also see [NOTICE.md](NOTICE.md) and [SECURITY.md](SECURITY.md).
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Demo media](docs/DEMO.md)
+- [CI setup](docs/CI_SETUP.md)
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
+- [API examples](API_EXAMPLES.md)
+- [Model card](MODEL_CARD.md)
+- [Dataset notice](DATASET_NOTICE.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Contributing](CONTRIBUTING.md)
+- [Support](SUPPORT.md)
+- [Release checklist](RELEASE_CHECKLIST.md)
 
 ## Demo media
 
