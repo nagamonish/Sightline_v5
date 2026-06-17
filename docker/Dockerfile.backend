@@ -13,5 +13,9 @@ COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
+# sample-data ships with the image so the PKLot demo route (which reads
+# sample-data/pklot/slots.json relative to the project root) works in a
+# fresh container without a separate volume mount.
+COPY sample-data /app/sample-data
 
 CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

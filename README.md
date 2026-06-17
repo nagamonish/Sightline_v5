@@ -81,14 +81,18 @@ cd Sightline_v5/frontend
 npm install
 ```
 
-Download the smaller YOLO OBB model:
+Download the smaller YOLO OBB model into `models/` (used by both the
+local run and the Docker compose stack, which mounts `./models` into
+the backend container):
 
 ```bash
 cd Sightline_v5
-python - <<'PY'
+mkdir -p models
+(cd models && python - <<'PY'
 from ultralytics import YOLO
 YOLO("yolov8n-obb.pt")
 PY
+)
 ```
 
 If the PKLot files are missing, recreate them:
@@ -134,7 +138,7 @@ ffmpeg -re -loop 1 -framerate 5 \
 cd Sightline_v5
 source .venv/bin/activate
 
-MODEL_PATH=yolov8n-obb.pt \
+MODEL_PATH=models/yolov8n-obb.pt \
 CONFIDENCE_THRESHOLD=0.15 \
 IOU_THRESHOLD=0.20 \
 .venv/bin/uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
