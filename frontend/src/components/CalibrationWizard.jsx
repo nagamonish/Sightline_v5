@@ -31,21 +31,11 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
   const [slots, setSlots] = useState([]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
   const [dragTarget, setDragTarget] = useState(null);
-  const [previewSize, setPreviewSize] = useState({ width: 1920, height: 1080 });
-  const [homography, setHomography] = useState({
-    src_points: [
-      [0, 0],
-      [1920, 0],
-      [1920, 1080],
-      [0, 1080],
-    ],
-    dst_points: [
-      [0, 0],
-      [1920, 0],
-      [1920, 1080],
-      [0, 1080],
-    ],
-  });
+  // Previously these were hardcoded to 1920x1080, which produced wrong
+  // perspective transforms for any stream that wasn't full HD. Both are now
+  // populated from the preview image's natural dimensions once it loads.
+  const [previewSize, setPreviewSize] = useState(null);
+  const [homography, setHomography] = useState(null);
 
   const base = apiUrl.replace(/\/$/, "");
   const previewStatuses = new Set([
@@ -66,14 +56,18 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
       : "";
   const selectedSlot = slots.find((slot) => slot.slot_id === selectedSlotId);
   const viewBox = useMemo(() => {
+    // Before the preview image has loaded we don't yet know the real frame
+    // size, so fall back to a 16:9 1920x1080 viewport for the empty SVG.
+    const width = previewSize?.width ?? 1920;
+    const height = previewSize?.height ?? 1080;
     const points = slots.flatMap((slot) => slot.polygon);
     if (!points.length) {
-      return `0 0 ${previewSize.width} ${previewSize.height}`;
+      return `0 0 ${width} ${height}`;
     }
-    const maxX = Math.max(previewSize.width, ...points.map((point) => point[0]));
-    const maxY = Math.max(previewSize.height, ...points.map((point) => point[1]));
+    const maxX = Math.max(width, ...points.map((point) => point[0]));
+    const maxY = Math.max(height, ...points.map((point) => point[1]));
     return `0 0 ${maxX} ${maxY}`;
-  }, [previewSize.height, previewSize.width, slots]);
+  }, [previewSize, slots]);
 
   async function testConnection() {
     setStatus("connecting");
@@ -292,10 +286,31 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
             alt=""
             aria-hidden="true"
             onLoad={(event) => {
-              setPreviewSize({
-                width: event.currentTarget.naturalWidth || 1920,
-                height: event.currentTarget.naturalHeight || 1080,
-              });
+              const width = event.currentTarget.naturalWidth;
+              const height = event.currentTarget.naturalHeight;
+              if (!width || !height) {
+                return;
+              }
+              setPreviewSize({ width, height });
+              // Seed the homography to an identity transform on the actual
+              // frame the user is looking at. Only do this on first load so
+              // any edits the user has already made aren't blown away.
+              setHomography((current) =>
+                current ?? {
+                  src_points: [
+                    [0, 0],
+                    [width, 0],
+                    [width, height],
+                    [0, height],
+                  ],
+                  dst_points: [
+                    [0, 0],
+                    [width, 0],
+                    [width, height],
+                    [0, height],
+                  ],
+                },
+              );
             }}
             src={streamUrl}
           />
@@ -349,39 +364,49 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
 
       <div className="homography-grid">
         <span>Homography</span>
-        {[0, 1, 2, 3].map((index) => (
-          <div className="homography-row" key={index}>
-            <input
-              aria-label={`Source x ${index + 1}`}
-              value={homography.src_points[index][0]}
-              onChange={(event) =>
-                updateHomographyPoint("src_points", index, 0, event.target.value)
-              }
-            />
-            <input
-              aria-label={`Source y ${index + 1}`}
-              value={homography.src_points[index][1]}
-              onChange={(event) =>
-                updateHomographyPoint("src_points", index, 1, event.target.value)
-              }
-            />
-            <input
-              aria-label={`Destination x ${index + 1}`}
-              value={homography.dst_points[index][0]}
-              onChange={(event) =>
-                updateHomographyPoint("dst_points", index, 0, event.target.value)
-              }
-            />
-            <input
-              aria-label={`Destination y ${index + 1}`}
-              value={homography.dst_points[index][1]}
-              onChange={(event) =>
-                updateHomographyPoint("dst_points", index, 1, event.target.value)
-              }
-            />
+        {homography ? (
+          [0, 1, 2, 3].map((index) => (
+            <div className="homography-row" key={index}>
+              <input
+                aria-label={`Source x ${index + 1}`}
+                value={homography.src_points[index][0]}
+                onChange={(event) =>
+                  updateHomographyPoint("src_points", index, 0, event.target.value)
+                }
+              />
+              <input
+                aria-label={`Source y ${index + 1}`}
+                value={homography.src_points[index][1]}
+                onChange={(event) =>
+                  updateHomographyPoint("src_points", index, 1, event.target.value)
+                }
+              />
+              <input
+                aria-label={`Destination x ${index + 1}`}
+                value={homography.dst_points[index][0]}
+                onChange={(event) =>
+                  updateHomographyPoint("dst_points", index, 0, event.target.value)
+                }
+              />
+              <input
+                aria-label={`Destination y ${index + 1}`}
+                value={homography.dst_points[index][1]}
+                onChange={(event) =>
+                  updateHomographyPoint("dst_points", index, 1, event.target.value)
+                }
+              />
+            </div>
+          ))
+        ) : (
+          <div className="homography-placeholder">
+            Waiting for preview frame to determine real dimensions…
           </div>
-        ))}
-        <button disabled={!cameraId} onClick={saveHomography} type="button">
+        )}
+        <button
+          disabled={!cameraId || !homography || !previewSize}
+          onClick={saveHomography}
+          type="button"
+        >
           Apply transform
         </button>
       </div>
