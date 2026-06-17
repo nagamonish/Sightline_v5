@@ -4,6 +4,14 @@ ParkIQ is a local AI parking detection demo. It reads an RTSP camera stream, det
 
 The project includes a small PKLot sample so you can test the app without a real camera.
 
+## License and use restrictions
+
+This project is proprietary and all rights are reserved.
+
+This repository is public only for review, demonstration, and portfolio visibility. It is not open source. You may view the repository, but you may not copy, use, modify, distribute, host, deploy, sell, or create derivative works from this code without prior written permission from Monish Munagala.
+
+Unauthorized use may result in legal action. See [LICENSE](LICENSE) for the full terms.
+
 ## Sample image
 
 Clean sample image:
@@ -181,4 +189,3 @@ docker/       Docker Compose, backend, frontend, and nginx files
 tests/        Detector tests
 sample-data/  Small PKLot fixture used for local testing
 ```
-
