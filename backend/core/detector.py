@@ -46,6 +46,26 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+# Shared YOLO model cache. Each ParkingDetector used to load its own YOLO
+# instance, so 10 cameras loaded the model 10 times — slow startup and 10x
+# the GPU/CPU memory. This cache keys by model path so any number of
+# detectors pointing at the same checkpoint share one loaded model object.
+_model_cache: dict[str, Any] = {}
+_model_cache_lock = threading.Lock()
+
+
+def _get_shared_yolo(model_path: str) -> Any:
+    """Return the YOLO instance for `model_path`, loading on first request."""
+    with _model_cache_lock:
+        cached = _model_cache.get(model_path)
+        if cached is None:
+            from ultralytics import YOLO  # imported lazily so unit tests can stub
+
+            cached = YOLO(model_path)
+            _model_cache[model_path] = cached
+        return cached
+
+
 def _to_numpy(value: Any) -> np.ndarray:
     if value is None:
         return np.array([])
@@ -293,9 +313,7 @@ class ParkingDetector:
         self.last_detections: list[dict[str, Any]] = []
 
         if self.model_path and self.model_path.lower() not in {"none", "disabled"}:
-            from ultralytics import YOLO
-
-            self.model = YOLO(self.model_path)
+            self.model = _get_shared_yolo(self.model_path)
         self.vehicle_class_ids = self._resolve_vehicle_class_ids()
 
     def set_homography(
