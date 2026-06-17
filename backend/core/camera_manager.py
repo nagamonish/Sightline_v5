@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 
 from backend.core.detector import ParkingDetector
+from backend.core.inference import InferenceQueue
 
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,7 @@ class CameraWorker:
     slots: list[dict[str, Any]] = field(default_factory=list)
     model_path: str | None = None
     on_change: ChangeCallback | None = None
+    inference_queue: InferenceQueue | None = None
 
     def __post_init__(self) -> None:
         self.stream = RTSPStream(self.camera_id, self.rtsp_url)
@@ -156,12 +158,17 @@ class CameraWorker:
 
     def start(self) -> None:
         self.stream.start()
+        # Register with the shared inference scheduler so frames flow through
+        # one fair round-robin queue instead of N independent contending threads.
+        if self.inference_queue is not None:
+            self.inference_queue.register(self.camera_id, self._process_inference_frame)
+            self.inference_queue.start()  # idempotent if already running
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
         self._thread = threading.Thread(
-            target=self._detect_loop,
-            name=f"detector-{self.camera_id}",
+            target=self._reader_loop if self.inference_queue is not None else self._detect_loop,
+            name=f"reader-{self.camera_id}",
             daemon=True,
         )
         self._thread.start()
@@ -170,6 +177,8 @@ class CameraWorker:
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
+        if self.inference_queue is not None:
+            self.inference_queue.deregister(self.camera_id)
         self.stream.stop()
 
     @property
@@ -230,7 +239,35 @@ class CameraWorker:
             "last_error": self.last_error or self.stream.last_error,
         }
 
+    def _reader_loop(self) -> None:
+        """Used when an InferenceQueue is attached. Reads frames and hands them
+        off to the shared scheduler — never runs the detector inline."""
+        assert self.inference_queue is not None
+        while not self._stop_event.is_set():
+            frame = self.stream.read(timeout=0.5)
+            if frame is None:
+                continue
+            # Drop-oldest behavior is enforced by the queue.
+            self.inference_queue.submit(self.camera_id, frame)
+
+    def _process_inference_frame(self, frame: np.ndarray) -> None:
+        """Called by the shared InferenceQueue worker thread."""
+        try:
+            changed_slots, annotated = self.detector.process_frame(frame)
+            with self._frame_lock:
+                self._annotated_frame = annotated
+            self.processed_frames += 1
+            self.last_processed_at = time.time()
+            self.last_error = None
+            if changed_slots and self.on_change is not None:
+                self.on_change(self.camera_id, changed_slots)
+        except Exception as exc:  # noqa: BLE001 - keep scheduler alive
+            self.last_error = str(exc)
+            logger.exception("camera %s detection failed", self.camera_id)
+
     def _detect_loop(self) -> None:
+        """Fallback path used when no InferenceQueue is attached. Kept for
+        backward compatibility with callers that build CameraWorker directly."""
         while not self._stop_event.is_set():
             frame = self.stream.read(timeout=0.5)
             if frame is None:
@@ -262,6 +299,10 @@ class CameraManager:
         self.on_change = on_change
         self._workers: dict[str, CameraWorker] = {}
         self._lock = threading.RLock()
+        # One scheduler shared across every camera owned by this manager. It
+        # services cameras round-robin so a single chatty camera can't lock
+        # the shared YOLO model and starve the rest.
+        self.inference_queue = InferenceQueue()
 
     def add_camera(
         self,
@@ -282,6 +323,7 @@ class CameraManager:
                 slots=slots or [],
                 model_path=self.model_path,
                 on_change=self.on_change,
+                inference_queue=self.inference_queue,
             )
             self._workers[camera_id] = worker
             if start:
