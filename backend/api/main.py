@@ -136,7 +136,7 @@ async def lifespan(_: FastAPI):
         event_loop = None
 
 
-app = FastAPI(title="ParkIQ API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Sightline API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

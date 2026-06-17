@@ -9,7 +9,7 @@ http://localhost:8000
 And the local RTSP demo stream is:
 
 ```text
-rtsp://127.0.0.1:8554/parkiq
+rtsp://127.0.0.1:8554/sightline
 ```
 
 ## Health
@@ -26,7 +26,7 @@ curl -X POST http://localhost:8000/cameras \
   -d '{
     "camera_id": "cam1",
     "name": "Sample Lot 1",
-    "rtsp_url": "rtsp://127.0.0.1:8554/parkiq",
+    "rtsp_url": "rtsp://127.0.0.1:8554/sightline",
     "slots": []
   }'
 ```

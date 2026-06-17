@@ -79,7 +79,7 @@ ffmpeg -re -loop 1 -framerate 5 \
   -g 10 \
   -f rtsp \
   -rtsp_transport tcp \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 ### Terminal 3: Backend
@@ -114,7 +114,7 @@ In the dashboard:
 1. Click `Add`.
 2. Camera ID: `cam1`.
 3. Name: `Sample Lot 1`.
-4. RTSP URL: `rtsp://127.0.0.1:8554/parkiq`.
+4. RTSP URL: `rtsp://127.0.0.1:8554/sightline`.
 5. Click `Load PKLot`.
 
 Expected result: 100 mapped parking spaces with live occupancy counts.
@@ -127,7 +127,7 @@ Check the RTSP stream:
 ffprobe -rtsp_transport tcp -v error \
   -show_entries stream=codec_type,width,height \
   -of json \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 Check the backend:

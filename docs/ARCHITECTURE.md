@@ -2,8 +2,6 @@
 
 Sightline connects RTSP camera streams to an AI detector, maps detected vehicles onto parking-space polygons, and sends live occupancy updates to a React dashboard.
 
-Some source files still display the old ParkIQ name until the rename issue is completed.
-
 ## System Diagram
 
 ```mermaid
@@ -68,5 +66,5 @@ The tracked PKLot fixture lives in `sample-data/pklot` and includes:
 The local RTSP URL used by the docs is:
 
 ```text
-rtsp://127.0.0.1:8554/parkiq
+rtsp://127.0.0.1:8554/sightline
 ```

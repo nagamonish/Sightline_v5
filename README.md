@@ -1,10 +1,8 @@
-# ParkIQ
+# Sightline
 
-ParkIQ is a local AI parking detection demo. It reads an RTSP camera stream, detects vehicles with YOLOv8 OBB, maps detections onto parking space polygons, and shows live occupancy in a React dashboard.
+Sightline is a local AI parking detection demo. It reads an RTSP camera stream, detects vehicles with YOLOv8 OBB, maps detections onto parking space polygons, and shows live occupancy in a React dashboard.
 
 The project includes a small PKLot sample so you can test the app without a real camera.
-
-> Note: this repository is named Sightline. Some app text still says ParkIQ until the rename issue is completed.
 
 ## License and use restrictions
 
@@ -46,7 +44,7 @@ Annotated reference image:
 RTSP URL to enter in the app:
 
 ```text
-rtsp://127.0.0.1:8554/parkiq
+rtsp://127.0.0.1:8554/sightline
 ```
 
 For the full demo flow, see [docs/DEMO.md](docs/DEMO.md).
@@ -70,7 +68,7 @@ brew install python@3.11 node ffmpeg mediamtx git
 From the project folder:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
@@ -79,14 +77,14 @@ pip install -r backend/requirements.txt
 Install frontend packages:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ/frontend
+cd Sightline_v5/frontend
 npm install
 ```
 
 Download the smaller YOLO OBB model:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 python - <<'PY'
 from ultralytics import YOLO
 YOLO("yolov8n-obb.pt")
@@ -96,7 +94,7 @@ PY
 If the PKLot files are missing, recreate them:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 python scripts/setup_pklot_sample.py --force
 ```
 
@@ -107,14 +105,14 @@ Use four terminal windows.
 ### Terminal 1: Start the RTSP server
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 mediamtx
 ```
 
 ### Terminal 2: Publish the sample image as an RTSP stream
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 
 ffmpeg -re -loop 1 -framerate 5 \
   -i sample-data/pklot/preview.jpg \
@@ -127,13 +125,13 @@ ffmpeg -re -loop 1 -framerate 5 \
   -g 10 \
   -f rtsp \
   -rtsp_transport tcp \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 ### Terminal 3: Start the backend
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 source .venv/bin/activate
 
 MODEL_PATH=yolov8n-obb.pt \
@@ -147,7 +145,7 @@ The local app will try Postgres first. If Postgres is not running, it falls back
 ### Terminal 4: Start the frontend
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ/frontend
+cd Sightline_v5/frontend
 npm run dev
 ```
 
@@ -164,7 +162,7 @@ In the dashboard:
 1. Click `Add`.
 2. Camera ID: `cam1`
 3. Name: `Sample Lot 1`
-4. RTSP URL: `rtsp://127.0.0.1:8554/parkiq`
+4. RTSP URL: `rtsp://127.0.0.1:8554/sightline`
 5. Click `Load PKLot`.
 
 You should see 100 mapped parking spaces and live occupancy counts.
@@ -177,7 +175,7 @@ Check that the RTSP stream is alive:
 ffprobe -rtsp_transport tcp -v error \
   -show_entries stream=codec_type,width,height \
   -of json \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 Check the backend:
@@ -190,7 +188,7 @@ curl http://localhost:8000/cameras
 Run backend tests:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ
+cd Sightline_v5
 source .venv/bin/activate
 PYTHONPATH=. python -m pytest -q
 ```
@@ -198,7 +196,7 @@ PYTHONPATH=. python -m pytest -q
 Build the frontend:
 
 ```bash
-cd /Users/nmmunagala/Documents/ParkIQ/frontend
+cd Sightline_v5/frontend
 npm run build
 ```
 

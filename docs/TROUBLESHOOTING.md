@@ -62,7 +62,7 @@ ffmpeg -re -loop 1 -framerate 5 \
   -g 10 \
   -f rtsp \
   -rtsp_transport tcp \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 Verify it:
@@ -71,7 +71,7 @@ Verify it:
 ffprobe -rtsp_transport tcp -v error \
   -show_entries stream=codec_type,width,height \
   -of json \
-  rtsp://127.0.0.1:8554/parkiq
+  rtsp://127.0.0.1:8554/sightline
 ```
 
 ## MediaMTX Says Path Is Not Configured
@@ -85,7 +85,7 @@ mediamtx mediamtx.yml
 The expected local path is:
 
 ```text
-rtsp://127.0.0.1:8554/parkiq
+rtsp://127.0.0.1:8554/sightline
 ```
 
 ## The App Shows Sample Missing

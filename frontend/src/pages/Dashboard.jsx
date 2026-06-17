@@ -130,7 +130,7 @@ export default function Dashboard() {
         <div className="brand">
           <div className="brand-mark">P</div>
           <div>
-            <strong>ParkIQ</strong>
+            <strong>Sightline</strong>
             <span>AI Parking Ops</span>
           </div>
         </div>
