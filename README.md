@@ -192,7 +192,7 @@ Run backend tests:
 ```bash
 cd /Users/nmmunagala/Documents/ParkIQ
 source .venv/bin/activate
-PYTHONPATH=. python -m pytest -q
+pytest -q
 ```
 
 Build the frontend:
