@@ -345,7 +345,7 @@ class Database:
                         date_trunc('hour', e.next_time),
                         interval '1 hour'
                     ) AS bucket
-                    WHERE e.next_time > now() - ($2::text || ' hours')::interval
+                    WHERE e.next_time > now() - make_interval(hours => $2)
                 ),
                 durations AS (
                     SELECT
@@ -359,7 +359,7 @@ class Database:
                             0
                         ) AS seconds_in_bucket
                     FROM bucketed
-                    WHERE bucket >= date_trunc('hour', now() - ($2::text || ' hours')::interval)
+                    WHERE bucket >= date_trunc('hour', now() - make_interval(hours => $2))
                 )
                 SELECT
                     bucket,
@@ -440,7 +440,9 @@ class Database:
                 ),
                 durations AS (
                     SELECT
-                        EXTRACT(HOUR FROM bucket)::int AS hour,
+                        -- Extract HOUR in UTC so the result is timezone-independent
+                        -- and matches the memory-mode path.
+                        EXTRACT(HOUR FROM (bucket AT TIME ZONE 'UTC'))::int AS hour,
                         occupied,
                         GREATEST(
                             EXTRACT(EPOCH FROM (
