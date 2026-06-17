@@ -1,0 +1,47 @@
+name: Setup help
+description: Ask for help running the local demo or Docker setup.
+title: "[Setup]: "
+labels:
+  - setup
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for install, RTSP, model, Docker, or local run problems.
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Docs checked
+      options:
+        - label: I checked README.md.
+        - label: I checked docs/LOCAL_SETUP.md.
+        - label: I checked docs/TROUBLESHOOTING.md.
+  - type: dropdown
+    id: run_mode
+    attributes:
+      label: Run mode
+      options:
+        - Local without Docker
+        - Docker Compose
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command that failed
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Terminal output
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Include OS, Python, Node, FFmpeg, MediaMTX, and Docker versions when possible.

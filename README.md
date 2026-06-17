@@ -4,6 +4,8 @@ ParkIQ is a local AI parking detection demo. It reads an RTSP camera stream, det
 
 The project includes a small PKLot sample so you can test the app without a real camera.
 
+> Note: this repository is named Sightline. Some app text still says ParkIQ until the rename issue is completed.
+
 ## License and use restrictions
 
 This project is proprietary and all rights are reserved.
@@ -12,7 +14,18 @@ This repository is public only for review, demonstration, and portfolio visibili
 
 Unauthorized use may result in legal action. See [LICENSE](LICENSE) for the full terms.
 
-## Sample image
+Also see [NOTICE.md](NOTICE.md) and [SECURITY.md](SECURITY.md).
+
+## Documentation
+
+- [Local setup](docs/LOCAL_SETUP.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Demo media](docs/DEMO.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+
+## Demo media
 
 Clean sample image:
 
@@ -27,6 +40,8 @@ RTSP URL to enter in the app:
 ```text
 rtsp://127.0.0.1:8554/parkiq
 ```
+
+For the full demo flow, see [docs/DEMO.md](docs/DEMO.md).
 
 ## What you need
 
@@ -169,7 +184,7 @@ Run backend tests:
 ```bash
 cd /Users/nmmunagala/Documents/ParkIQ
 source .venv/bin/activate
-python -m pytest tests
+PYTHONPATH=. python -m pytest -q
 ```
 
 Build the frontend:

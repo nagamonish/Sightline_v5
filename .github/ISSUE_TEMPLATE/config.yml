@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security policy
+    url: https://github.com/nagamonish/Sightline_v5/security/policy
+    about: Please do not report security vulnerabilities in public issues.

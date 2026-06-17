@@ -12,6 +12,7 @@ outputs/
 *.pt
 .env
 .env.*
+!.env.example
 
 sample-data/*
 !sample-data/pklot/
