@@ -6,7 +6,7 @@ services:
     environment:
       DATABASE_URL: postgresql://parkiq:parkiq@postgres:5432/parkiq
       REDIS_URL: redis://redis:6379
-      MODEL_PATH: /models/yolov8m-obb.pt
+      MODEL_PATH: /models/yolov8n-obb.pt
       IOU_THRESHOLD: "0.40"
       CONFIDENCE_THRESHOLD: "0.45"
       SMOOTHING_WINDOW: "5"
