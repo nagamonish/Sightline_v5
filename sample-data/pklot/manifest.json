@@ -1,0 +1,9 @@
+{
+  "total": 100,
+  "expected_occupied": 68,
+  "expected_available": 32,
+  "slots_json": "sample-data/pklot/slots.json",
+  "preview_image": "sample-data/pklot/preview.jpg",
+  "overlay_image": "sample-data/pklot/overlay.jpg",
+  "ffmpeg_command": "ffmpeg -re -loop 1 -framerate 5 -i sample-data/pklot/preview.jpg -vf \"format=yuv420p\" -an -c:v libx264 -preset ultrafast -tune zerolatency -r 5 -g 10 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/parkiq"
+}
