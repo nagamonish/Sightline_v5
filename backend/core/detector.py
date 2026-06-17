@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import threading
 import time
@@ -195,6 +196,13 @@ class ParkingSlot:
     occupied_since: float | None = None
     smoothing_window: int = 5
 
+    # Flip thresholds expressed as fractions of the smoothing window. For the
+    # default 5-frame window this yields >= 4 (occupy) and <= 2 (free), matching
+    # the original hardcoded behavior; for any other window size the thresholds
+    # scale proportionally instead of silently producing wrong results.
+    _OCCUPIED_VOTE_RATIO: float = 0.8
+    _FREE_VOTE_RATIO: float = 0.4
+
     def __post_init__(self) -> None:
         self.polygon = normalize_polygon(self.polygon)
         if self.vote_buffer.maxlen != self.smoothing_window:
@@ -206,6 +214,15 @@ class ParkingSlot:
             )
         if self.occupied and self.occupied_since is None:
             self.occupied_since = self.last_changed
+        # Derive flip thresholds from the configured smoothing window. Always
+        # require at least one positive vote to flip to occupied so degenerate
+        # tiny windows still behave sensibly.
+        self._occupied_threshold: int = max(
+            1, math.ceil(self.smoothing_window * self._OCCUPIED_VOTE_RATIO)
+        )
+        self._free_threshold: int = math.floor(
+            self.smoothing_window * self._FREE_VOTE_RATIO
+        )
 
     def update_votes(self, is_occupied: bool, confidence: float = 1.0) -> bool:
         """Update temporal votes and return True when the stable state flips."""
@@ -220,9 +237,9 @@ class ParkingSlot:
         occupied_votes = sum(self.vote_buffer)
         next_state = self.occupied
 
-        if not self.occupied and occupied_votes >= 4:
+        if not self.occupied and occupied_votes >= self._occupied_threshold:
             next_state = True
-        elif self.occupied and occupied_votes <= 2:
+        elif self.occupied and occupied_votes <= self._free_threshold:
             next_state = False
 
         if next_state == self.occupied:
