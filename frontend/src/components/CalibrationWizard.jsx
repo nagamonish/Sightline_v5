@@ -36,6 +36,13 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
   // populated from the preview image's natural dimensions once it loads.
   const [previewSize, setPreviewSize] = useState(null);
   const [homography, setHomography] = useState(null);
+  // Point-picking mode: when active, clicks on the preview stage drop
+  // homography corners instead of editing slots. picking === null disables
+  // the picker; otherwise it's the field being populated and the index of
+  // the next corner (0..3, in TL, TR, BR, BL order).
+  const [picking, setPicking] = useState(null);
+
+  const PICK_LABELS = ["top-left", "top-right", "bottom-right", "bottom-left"];
 
   const base = apiUrl.replace(/\/$/, "");
   const previewStatuses = new Set([
@@ -234,6 +241,34 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
     }));
   }
 
+  function startPicking(group) {
+    if (!previewSize) {
+      return; // can't pick without knowing the real frame size
+    }
+    setPicking({ group, index: 0 });
+  }
+
+  function cancelPicking() {
+    setPicking(null);
+  }
+
+  function handleStageClick(event) {
+    if (!picking || !svgRef.current || !homography) {
+      return;
+    }
+    const point = pointFromSvgEvent(svgRef.current, event);
+    const { group, index } = picking;
+    setHomography((current) => ({
+      ...current,
+      [group]: current[group].map((existing, i) => (i === index ? point : existing)),
+    }));
+    if (index < 3) {
+      setPicking({ group, index: index + 1 });
+    } else {
+      setPicking(null);
+    }
+  }
+
   return (
     <aside className="calibration-panel">
       <div className="panel-heading">
@@ -277,10 +312,22 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
       </div>
 
       <div
-        className="calibration-stage"
+        className={`calibration-stage${picking ? " picking" : ""}`}
         onPointerMove={updateDraggedPoint}
         onPointerUp={() => setDragTarget(null)}
+        onClick={picking ? handleStageClick : undefined}
+        style={picking ? { cursor: "crosshair" } : undefined}
       >
+        {picking ? (
+          <div className="picking-banner">
+            Click the <strong>{PICK_LABELS[picking.index]}</strong> corner of the{" "}
+            <strong>{picking.group === "src_points" ? "source" : "destination"}</strong>{" "}
+            quad ({picking.index + 1} of 4) ·{" "}
+            <button onClick={cancelPicking} type="button">
+              cancel
+            </button>
+          </div>
+        ) : null}
         {streamUrl ? (
           <img
             alt=""
@@ -346,6 +393,50 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
               ) : null}
             </g>
           ))}
+
+          {/* Homography quad overlays. Render the source quad as a closed
+              polyline plus numbered handles so users can see exactly which
+              corners they've placed. Destination quad rendered the same way
+              when its been edited away from identity. */}
+          {homography
+            ? ["src_points", "dst_points"].map((group) => (
+                <g
+                  className={`homography-quad ${group}`}
+                  key={group}
+                  pointerEvents="none"
+                >
+                  <polygon
+                    fill="none"
+                    points={homography[group]
+                      .map((point) => point.join(","))
+                      .join(" ")}
+                    stroke={group === "src_points" ? "#3ad29f" : "#f5a623"}
+                    strokeDasharray={group === "dst_points" ? "8 6" : undefined}
+                    strokeWidth={3}
+                  />
+                  {homography[group].map((point, index) => (
+                    <g key={`${group}-${index}`}>
+                      <circle
+                        cx={point[0]}
+                        cy={point[1]}
+                        fill={group === "src_points" ? "#3ad29f" : "#f5a623"}
+                        r="10"
+                      />
+                      <text
+                        fill="#0b0b16"
+                        fontSize="14"
+                        fontWeight="700"
+                        textAnchor="middle"
+                        x={point[0]}
+                        y={point[1] + 5}
+                      >
+                        {index + 1}
+                      </text>
+                    </g>
+                  ))}
+                </g>
+              ))
+            : null}
         </svg>
       </div>
 
@@ -364,6 +455,30 @@ export function CalibrationWizard({ apiUrl, onComplete }) {
 
       <div className="homography-grid">
         <span>Homography</span>
+        <div className="homography-pickers">
+          <button
+            disabled={!previewSize || picking !== null}
+            onClick={() => startPicking("src_points")}
+            type="button"
+          >
+            Pick source corners
+          </button>
+          <button
+            disabled={!previewSize || picking !== null}
+            onClick={() => startPicking("dst_points")}
+            type="button"
+          >
+            Pick destination corners
+          </button>
+          {picking ? (
+            <small>
+              picking {picking.group === "src_points" ? "source" : "destination"}{" "}
+              · corner {picking.index + 1} of 4
+            </small>
+          ) : (
+            <small>or fine-tune the numeric inputs below</small>
+          )}
+        </div>
         {homography ? (
           [0, 1, 2, 3].map((index) => (
             <div className="homography-row" key={index}>
