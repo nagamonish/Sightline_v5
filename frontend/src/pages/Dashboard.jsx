@@ -8,8 +8,30 @@ import { useCameraStream } from "../hooks/useCameraStream.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_URL =
-  import.meta.env.VITE_WS_URL || API_URL.replace(/^http/, "ws").replace(/\/$/, "") + "/ws";
+
+// Derive the WebSocket URL at *runtime* (not build time) so the same
+// production bundle works for any viewer, regardless of which host they
+// loaded the page from. Falls back to API_URL-based derivation when the
+// API URL is absolute (dev with the Vite dev server on :5173 talking to
+// the backend on :8000). VITE_WS_URL is still honored as an explicit
+// override for unusual setups.
+function deriveWsUrl() {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  if (/^https?:\/\//i.test(API_URL)) {
+    return API_URL.replace(/^http/i, "ws").replace(/\/+$/, "") + "/ws";
+  }
+  // Relative API (e.g. production behind nginx). Use the page's own host
+  // and auto-select ws/wss based on the page protocol.
+  if (typeof window !== "undefined" && window.location) {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws`;
+  }
+  return "ws://localhost/ws";
+}
+
+const WS_URL = deriveWsUrl();
 
 function mergeChangedSlots(currentSlots, changedSlots) {
   const byId = new Map(currentSlots.map((slot) => [slot.slot_id, slot]));
