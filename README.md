@@ -142,7 +142,7 @@ IOU_THRESHOLD=0.20 \
 .venv/bin/uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
 ```
 
-The local app will try Postgres first. If Postgres is not running, it falls back to in-memory storage. That is fine for local testing.
+The local app will try Postgres first. If Postgres is not running, it falls back to in-memory storage, which is fine for local testing. To skip the connection attempt entirely and silence the fallback warning, set `DATABASE_URL=memory`.
 
 ### Terminal 4: Start the frontend
 

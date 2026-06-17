@@ -35,6 +35,14 @@ class Database:
             logger.warning("asyncpg unavailable; using in-memory persistence")
             return
 
+        # Explicit opt-in: skip the connection attempt entirely. Useful for local
+        # runs where Postgres isn't installed and the noisy fallback warning is
+        # just clutter.
+        if self.database_url.strip().lower() == "memory":
+            self.memory_mode = True
+            logger.info("DATABASE_URL=memory; using in-memory persistence")
+            return
+
         try:
             self.pool = await asyncpg.create_pool(
                 self.database_url,
@@ -45,7 +53,17 @@ class Database:
             self.memory_mode = False
         except Exception:  # noqa: BLE001 - allow app to boot for camera/UI work.
             self.memory_mode = True
-            logger.exception("database unavailable; using in-memory persistence")
+            # Short, friendly message by default — the fallback is expected behavior
+            # for local/demo runs. The full traceback is still available when the
+            # user opts into DEBUG logging.
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.exception("Postgres unreachable; using in-memory persistence")
+            else:
+                logger.warning(
+                    "Postgres unreachable; using in-memory persistence (fine for "
+                    "local/demo). Set DATABASE_URL=memory to skip the connection "
+                    "attempt, or enable DEBUG logging for the full traceback."
+                )
 
     async def close(self) -> None:
         if self.pool is not None:
