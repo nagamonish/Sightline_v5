@@ -48,6 +48,10 @@ No fixed 100-slot ceiling — the count is whatever the model sees.
 
 ![Auto-discovered slots, red = occupied, green = available](docs/screenshots/auto-discovered-slots.png)
 
+The full before/after — model swap, threshold tuning, dynamic slot
+generation, and empty-bay inference — is documented in
+[docs/AUTO_DISCOVERY.md](docs/AUTO_DISCOVERY.md).
+
 RTSP URL to enter in the app:
 
 ```text
