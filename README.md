@@ -41,6 +41,13 @@ Annotated reference image:
 
 ![PKLot slot overlay](sample-data/pklot/overlay.jpg)
 
+Live auto-discovery (produced by `scripts/infer_empty_slots.py`):
+every detected car becomes a red occupied slot (Cxxx), and the gaps
+between cars in each row are filled with green available slots (Exxx).
+No fixed 100-slot ceiling — the count is whatever the model sees.
+
+![Auto-discovered slots, red = occupied, green = available](docs/screenshots/auto-discovered-slots.png)
+
 RTSP URL to enter in the app:
 
 ```text
